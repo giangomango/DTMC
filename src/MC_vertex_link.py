@@ -66,8 +66,16 @@ def fliplink(ver,neig,x,y):
         u[x_ind]=y_new
         v[y_ind]=x_new
         d=np.linalg.norm(ver[x_new]-ver[y_new])
-    if y_new in neig[x_new]: #Check that new edge that is being added is not already present.(Can happen due to pyramidal
-        return x,y,0         #configurations, leading to same triangle appearing multiple times and deleting edges)
+        if neig[x_new,y_new]==1: #Check that new edge that is being added is not already present.(Can happen due to pyramidal
+            return x,y,0         #configurations, leading to same triangle appearing multiple times and deleting edges)
+        for i in range(0,2):
+            if neig[both[i]].nnz<=3: #Check that removing thether don't leave vertices with less than 3 neighbours
+                return x,y,0
+            
+      #  neig[both[0],both[1]]=0
+       # neig[x_new,y_new]=1
+        
+
       #PRESERV COUNTER-CLOCKWISE ORDER
 
     return u,v,d
@@ -79,25 +87,19 @@ def fliplink(ver,neig,x,y):
 def MCstep_link(ver,TRI,β,k,r):
     ev,et,te=igl.edge_topology(ver,TRI)
     index=np.random.permutation(len(ev))
+    neig=igl.adjacency_matrix(TRI)
     for n in index[0:len(ver)]:
         ev,et,te=igl.edge_topology(ver,TRI) #Calculate topology at each step, changes indicization, could try to flip same edge
-        neig=igl.adjacency_list(TRI)
+        neig=igl.adjacency_matrix(TRI)
         l,t=te[n][0],te[n][1]
-        if l!=-1 or t!=-1: #Don't flip border edges
+        if l!=-1 and t!=-1: #Don't flip border edges
             x=np.copy(TRI[l]) #te[n] contains labels of the triangles that share that edge
             y=np.copy(TRI[t])
             u,v,d=fliplink(ver,neig,x,y)
             if r< d< np.sqrt(2) and d!=0: #just need to check if new edge creates overlap of hard beads or too large thether
                 H_old=elastic_energy(ver,TRI,k)
-                E=igl.edges(TRI)
                 TRI[l]=u #substitute new triangles in TRI 
                 TRI[t]=v
-                 #check that no nodes with less than 3 neighbours
-                for z in range(0,len(neig)):
-                    if len(neig[z])<3:
-                        TRI[l]=x
-                        TRI[t]=y
-                        break
                 H_new=elastic_energy(ver,TRI,k)
                 ΔH=H_new-H_old
                 P=min(1, np.exp(-β* ΔH))

@@ -12,30 +12,69 @@ import random
 # In[2]:
 
 
-def MCstep_vertex(ver,TRI,σ,r,k,β): #tries to move N vertices
+def MCstep_vertex(ver,TRI,header,linklis,L,σ,r,k,β): #tries to move N vertices
     neighbour=igl.adjacency_list(TRI) 
     index=np.random.permutation(len(ver))
     for i in index:
         δ=np.array([random.uniform(-σ,σ),random.uniform(-σ,σ),random.uniform(-σ,σ)])
         H_old=elastic_energy(ver,TRI,k)
         x0=ver[i]
+        cx,cy,cz= x0[0] // 1, x0[1] // 1, x0[2] // 1 #keep track of starting cell of x0
         x0+=δ #shift vertex
-        for j in range(0,len(ver)): #For now at each step check overlap with all other vertices, O(N^2), SLOW
+        for j in neighbour[i]:#For the neighbours check also that thether distance don't exeed max of sqrt(2)
             d=np.linalg.norm(x0-ver[j])
-            if j in neighbour[i]:#For the neighbours check also that thether distance don't exeed max of sqrt(2)
-                if d < r or d > np.sqrt(2):
-                    x0-=δ #if neighbours too far put back vertex and break cycle
-                    break
+            if d < r or d > np.sqrt(2):
+                x0-=δ #if neighbours too far put back vertex and break cycle
+                break
+        else:
+            cix,ciy,ciz= x0[0] // 1, x0[1] // 1, x0[2] // 1 #cell corresponding to new position
+            cell_neig=[]
+            for dx in range(-1,2): #also (0,0,0) so also checks that no overlap with particles contained in cell corresponding
+                for dy in range(-1,2): #to new position
+                    for dz in range(-1,2):
+                        nx,ny,nz=int(cix+dx),int(ciy+dy),int(ciz+dz)
+                        n=int(nx*L*L+ny*L+nz*L)
+                        z=header[n]
+                        while(z!=-1):
+                            if z!=-1 and z not in cell_neig:
+                                cell_neig.append(z)
+                            z=int(linklis[z])
+                            
+            for c in cell_neig: #Check no overlaps with particles contained in neig cells
+                d=np.linalg.norm(x0-ver[c])
+                if d < r and d!=0: 
+                        x0-=δ    #two  vertices overlap. Put back the vertex in it's original position
+                        break
             else:
-                if d < r and d!=0: #for all other vertices check only that they don't overlap
-                    x0-=δ    #two  vertices overlap. Put back the vertex in it's original position
-                    break
-        H_new=elastic_energy(ver,TRI,k) #if already rejected move energies are equal and P=1, so rand never greater
-        ΔH=H_new-H_old
-        P=min(1, np.exp(-β* ΔH))
-        if np.random.rand()>P: #with probability 1-P put vertex back
-            x0-=δ
-
+                H_new=elastic_energy(ver,TRI,k) #if already rejected move energies are equal and P=1, so rand never greater
+                ΔH=H_new-H_old
+                P=min(1, np.exp(-β* ΔH))
+                if np.random.rand()>P: #with probability 1-P put vertex back
+                    x0-=δ
+                else: #particle shifted, update cell list linked list
+                    c=int(cx*L*L+cy*L+cz*L) #linear index containing x0,that has now been shifted
+                    ci=int(cix*L*L+ciy*L+ciz*L) #new linear index of cell containing x0
+                    if c!=ci: #shift particle only if it changes cell
+                        if header[c]==i: #if header of starting cell was x0
+                            header[c]=linklis[i]  #update header of cell where removing x0, new header particle to which x0
+                        else:                     #pointed (-1 if none)
+                            z=header[c]
+                            #print(i)
+                            while(z!=i): #find particle that pointed to i
+                                q=z
+                                z=int(linklis[z])
+                                #print(q,z)
+                            linklis[q]=linklis[i] #removing x0 particle that pointed to x0 points to particle that was pointed 
+                                                  #by x0
+                        if header[ci]==-1: #updates for new cell containing x0, if empty x0 now points to empty and becomes new 
+                                           #header
+                            linklis[i]=-1
+                            header[ci]=i
+                        else: #if particle already present, x0 points to previous header and becomes new header
+                            linklis[i]=header[ci]
+                            header[ci]=i
+            break
+        break
 
 # In[3]:
 
@@ -72,8 +111,8 @@ def fliplink(ver,neig,x,y):
             if neig[both[i]].nnz<=3: #Check that removing thether don't leave vertices with less than 3 neighbours
                 return x,y,0
             
-      #  neig[both[0],both[1]]=0
-       # neig[x_new,y_new]=1
+        #neig[both[0],both[1]]=0
+        #neig[x_new,y_new]=1
         
 
       #PRESERV COUNTER-CLOCKWISE ORDER
@@ -84,7 +123,7 @@ def fliplink(ver,neig,x,y):
 # In[ ]:
 
 
-def MCstep_link(ver,TRI,β,k,r):
+def MCstep_link(ver,TRI,β,k,r): #tries to flip N links
     ev,et,te=igl.edge_topology(ver,TRI)
     index=np.random.permutation(len(ev))
     neig=igl.adjacency_matrix(TRI)

@@ -13,7 +13,7 @@ import random
 
 
 def MCstep_vertex(ver,TRI,header,linklis,L,σ,r,k,β): #tries to move N vertices
-    neighbour=igl.adjacency_list(TRI) 
+    neighbour=igl.adjacency_list(TRI)
     index=np.random.permutation(len(ver))
     for i in index:
         δ=np.array([random.uniform(-σ,σ),random.uniform(-σ,σ),random.uniform(-σ,σ)])
@@ -36,7 +36,7 @@ def MCstep_vertex(ver,TRI,header,linklis,L,σ,r,k,β): #tries to move N vertices
                         n=int(nx*L*L+ny*L+nz*L)
                         z=header[n]
                         while(z!=-1):
-                            if z!=-1 and z not in cell_neig:
+                            if z!=-1 and z not in cell_neig:#already checked no overlap with mesh neig
                                 cell_neig.append(z)
                             z=int(linklis[z])
                             
@@ -73,13 +73,10 @@ def MCstep_vertex(ver,TRI,header,linklis,L,σ,r,k,β): #tries to move N vertices
                         else: #if particle already present, x0 points to previous header and becomes new header
                             linklis[i]=header[ci]
                             header[ci]=i
-            break
-        break
 
 # In[3]:
 
-
-def fliplink(ver,neig,x,y):
+def fliplink(ver,neig,x,y): #PRESERV COUNTER-CLOCKWISE ORDER
     x_new=0
     y_new=0            #x_new. y_new elements not contained in the edge, that will form new edge
     x_ind=0 #indices of first vertex forming old edge in x and second vertex forming old edge in y
@@ -91,6 +88,7 @@ def fliplink(ver,neig,x,y):
     for i in x:
         if i in y:
             both.append(i)
+    #print(both,"BOTH")
     if len(both)==2:
         for i in range(0,len(x)):
             if x[i]== both[0]:
@@ -104,37 +102,31 @@ def fliplink(ver,neig,x,y):
                 y_new=y[j]
         u[x_ind]=y_new
         v[y_ind]=x_new
+        ev_new=[x_new,y_new]
         d=np.linalg.norm(ver[x_new]-ver[y_new])
-        if neig[x_new,y_new]==1: #Check that new edge that is being added is not already present.(Can happen due to pyramidal
-            return x,y,0         #configurations, leading to same triangle appearing multiple times and deleting edges)
+        if neig[x_new,y_new]==1:#Check that new edge that is being added is not already present.(Can happen due to pyramidal
+            return x,y,0,0,0 #configurations, leading to same triangle appearing multiple times and deleting edges)
         for i in range(0,2):
-            if neig[both[i]].nnz<=3: #Check that removing thether don't leave vertices with less than 3 neighbours
-                return x,y,0
-            
-        #neig[both[0],both[1]]=0
-        #neig[x_new,y_new]=1
-        
-
-      #PRESERV COUNTER-CLOCKWISE ORDER
-
-    return u,v,d
+            if neig[both[i]].nnz==3: #Check that removing thether don't leave vertices with less than 3 neighbours
+                return x,y,0,0,0
+        return u,v,d,ev_new,both
+    return x,y,0,0,0
 
 
 # In[ ]:
 
-
-def MCstep_link(ver,TRI,β,k,r): #tries to flip N links
-    ev,et,te=igl.edge_topology(ver,TRI)
-    index=np.random.permutation(len(ev))
-    neig=igl.adjacency_matrix(TRI)
+#ev,et,te=igl.edge_topology(ver,TRI)
+#neig=igl.adjacency_matrix(TRI)
+def MCstep_link(ver,TRI,neig,β,k,r,ev,et,te): #tries to flip N links
+    index=np.random.permutation(len(te))
     for n in index[0:len(ver)]:
-        ev,et,te=igl.edge_topology(ver,TRI) #Calculate topology at each step, changes indicization, could try to flip same edge
-        neig=igl.adjacency_matrix(TRI)
         l,t=te[n][0],te[n][1]
         if l!=-1 and t!=-1: #Don't flip border edges
             x=np.copy(TRI[l]) #te[n] contains labels of the triangles that share that edge
             y=np.copy(TRI[t])
-            u,v,d=fliplink(ver,neig,x,y)
+            #print(x,y,"OLD")
+            u,v,d,ev_new,both=fliplink(ver,neig,x,y)
+            #print(u,v,"NEW")
             if r< d< np.sqrt(2) and d!=0: #just need to check if new edge creates overlap of hard beads or too large thether
                 H_old=elastic_energy(ver,TRI,k)
                 TRI[l]=u #substitute new triangles in TRI 
@@ -145,4 +137,40 @@ def MCstep_link(ver,TRI,β,k,r): #tries to flip N links
                 if np.random.rand() > P: #with probability 1-P put old triangles back
                     TRI[l]=x 
                     TRI[t]=y
-
+                else: #Link flipped, update topology
+                    ev[n]=ev_new #ev OK, only egde changing vertices is the flipped one
+                    neig_edges=[]
+                    for i in range(0,3):#List of neigh edges of tethrahedron
+                        if et[l][i]!=n and et[l][i] not in neig_edges:
+                            neig_edges.append(et[l][i])
+                        if et[t][i]!=n and et[t][i] not in neig_edges:
+                            neig_edges.append(et[t][i])
+                            
+                    for j in neig_edges: #for all edges in neig check at which of the new triangle it belongs and update te
+                        if ev[j][0] in TRI[l] and ev[j][1] in TRI[l]:
+                            if l not in te[j]:
+                                if te[j][0]==t:
+                                    te[j][0]=l
+                                else:
+                                    te[j][1]=l
+                        else: #if ev[j] not in TRI[l] then in TRI[t] by def
+                            if t not in te[j]:
+                                if te[j][0]==l:
+                                    te[j][0]=t
+                                else:
+                                    te[j][1]=t   #te OK
+                    
+                    et_l_new=[n]
+                    et_t_new=[n]
+                    for z in neig_edges: #update list of edge used in triangles t and l
+                        if t in te[z]:
+                            et_t_new.append(z)
+                        if l in te[z]:
+                            et_l_new.append(z)
+                    et[l]=np.array(et_l_new)
+                    et[t]=np.array(et_t_new)
+                    
+                    neig[both[0],both[1]]=0 #Update neig matrix
+                    neig[both[1],both[0]]=0
+                    neig[ev_new[0],ev_new[1]]=1
+                    neig[ev_new[1],ev_new[0]]=1

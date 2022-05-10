@@ -15,45 +15,50 @@ import random
 def MCstep_vertex(ver,TRI,header,linklis,L,σ,r,k,β): #tries to move N vertices
     neighbour=igl.adjacency_list(TRI)
     index=np.random.permutation(len(ver))
+    #count=0
     for i in index:
+        #count+=1
         δ=np.array([random.uniform(-σ,σ),random.uniform(-σ,σ),random.uniform(-σ,σ)])
         H_old=elastic_energy(ver,TRI,k)
         x0=ver[i]
         cx,cy,cz= x0[0] // 1, x0[1] // 1, x0[2] // 1 #keep track of starting cell of x0
         x0+=δ #shift vertex
+        boole=0
         for j in neighbour[i]:#For the neighbours check also that thether distance don't exeed max of sqrt(2)
             d=np.linalg.norm(x0-ver[j])
             if d < r or d > np.sqrt(2):
                 x0-=δ #if neighbours too far put back vertex and break cycle
+                boole=1 
                 break
-        else:
+        if boole==0:
             cix,ciy,ciz= x0[0] // 1, x0[1] // 1, x0[2] // 1 #cell corresponding to new position
             cell_neig=[]
             for dx in range(-1,2): #also (0,0,0) so also checks that no overlap with particles contained in cell corresponding
                 for dy in range(-1,2): #to new position
                     for dz in range(-1,2):
                         nx,ny,nz=int(cix+dx),int(ciy+dy),int(ciz+dz)
-                        n=int(nx*L*L+ny*L+nz*L)
+                        n=int(nx*L[1]*L[2]+ny*L[2]+nz)
                         z=header[n]
                         while(z!=-1):
-                            if z!=-1 and z not in cell_neig:#already checked no overlap with mesh neig
+                            if z not in neighbour[i]:#already checked no overlap with mesh neig
                                 cell_neig.append(z)
                             z=int(linklis[z])
                             
             for c in cell_neig: #Check no overlaps with particles contained in neig cells
                 d=np.linalg.norm(x0-ver[c])
                 if d < r and d!=0: 
-                        x0-=δ    #two  vertices overlap. Put back the vertex in it's original position
-                        break
-            else:
+                    x0-=δ    #two  vertices overlap. Put back the vertex in it's original position
+                    boole=1
+                    break
+            if boole==0:
                 H_new=elastic_energy(ver,TRI,k) #if already rejected move energies are equal and P=1, so rand never greater
                 ΔH=H_new-H_old
                 P=min(1, np.exp(-β* ΔH))
                 if np.random.rand()>P: #with probability 1-P put vertex back
                     x0-=δ
                 else: #particle shifted, update cell list linked list
-                    c=int(cx*L*L+cy*L+cz*L) #linear index containing x0,that has now been shifted
-                    ci=int(cix*L*L+ciy*L+ciz*L) #new linear index of cell containing x0
+                    c=int(cx*L[1]*L[2]+cy*L[2]+cz) #linear index that containined x0,that has now been shifted
+                    ci=int(cix*L[1]*L[2]+ciy*L[2]+ciz) #new linear index of cell containing x0
                     if c!=ci: #shift particle only if it changes cell
                         if header[c]==i: #if header of starting cell was x0
                             header[c]=linklis[i]  #update header of cell where removing x0, new header particle to which x0

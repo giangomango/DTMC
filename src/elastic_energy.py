@@ -17,7 +17,7 @@ import numpy as np
 
 
 def elastic_energy(ver,TRI,k):
-    pd1, pd2, c1, c2 = igl.principal_curvature(ver, TRI) #principal curvatures
+    pd1, pd2, c1, c2 = igl.principal_curvature(ver, TRI,2) #principal curvatures
     ADJ,NI=igl.vertex_triangle_adjacency(TRI, len(ver)) #faces adjacent to vertices to calculate vertex area
     area = igl.doublearea(ver, TRI) / 2.0 #doublearea computes double area of each triangle of the mesh
     A_v=np.zeros(len(ver)) #To calculate vector of vertex areas

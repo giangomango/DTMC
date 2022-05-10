@@ -82,18 +82,24 @@ def create_mesh(triangular_lattice):
 
 def linked_list_cell(ver):
     max_x=max(ver[:,0]) #DEFINE LINKED-LIST CELL
-    L=int(5*max_x) #define space of simulation as box 5 times x_max to ensure particles don't exit during simulation
+    max_y=max(ver[:,1])
+    max_z=max(ver[:,2])
+    Lx=int(5*max_x) #define space of simulation as box 5 times x_max to ensure particles don't exit during simulation
+    Ly=int(5*max_y)
+    Lz=int(5*max_z)
+    
     linklis=np.zeros(len(ver)) #vector of pointers for each particle to preceeding particle in same cell. -1 if no other particl
-    header=np.full(L**3,-1) #vector of headers containing last particle inserted in each cell
+    header=np.full(Lx*Ly*Lz,-1) #vector of headers containing last particle inserted in each cell
 
     for i in range(0,len(ver)):
             cx,cy,cz= ver[i][0] // 1, ver[i][1] // 1, ver[i][2] // 1 #floor division to find cartesian coordinates of cell
-            c=int(cx*L*L+cy*L+cz*L) #linear coordinate
+            c=int(cx*Ly*Lz+cy*Lz+cz) #linear coordinate
             if header[c]==-1: #if cell empty i-th element that is being inserted points to empty linklis[i]=-1
                 linklis[i]=-1
             else:
                 linklis[i]=header[c] #point i-th element to the preceding one already contained in same cell
             header[c]=i #update header of the cell
+    L=[Lx,Ly,Lz]
     return header,linklis,L
 
         

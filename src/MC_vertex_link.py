@@ -6,20 +6,17 @@
 
 import igl
 import numpy as np
-from src.elastic_energy import elastic_energy
+from src.elastic_energy import update_energy_vertex
+from src.elastic_energy import update_energy_neig
+from src.elastic_energy import update_energy_link
 import random
 
-# In[2]:
-
-
-def MCstep_vertex(ver,TRI,header,linklis,L,σ,r,k,β): #tries to move N vertices
-    neighbour=igl.adjacency_list(TRI)
-    index=np.random.permutation(len(ver))
+def MCstep_vertexB(ver,TRI,header,linklis,L,σ,r,k,β,H,c1,c2,A_v,normals_face,ADJ,NI,neighbour,et,ev,SHO,ver_bulk,border,area): #tries to move N vertices
+    index=np.random.permutation(ver_bulk) #border vertices are fixed
     #count=0
     for i in index:
         #count+=1
         δ=np.array([random.uniform(-σ,σ),random.uniform(-σ,σ),random.uniform(-σ,σ)])
-        H_old=elastic_energy(ver,TRI,k)
         x0=ver[i]
         cx,cy,cz= x0[0] // 1, x0[1] // 1, x0[2] // 1 #keep track of starting cell of x0
         x0+=δ #shift vertex
@@ -51,11 +48,22 @@ def MCstep_vertex(ver,TRI,header,linklis,L,σ,r,k,β): #tries to move N vertices
                     boole=1
                     break
             if boole==0:
-                H_new=elastic_energy(ver,TRI,k) #if already rejected move energies are equal and P=1, so rand never greater
-                ΔH=H_new-H_old
+                H_new, Av_new, Nf_old, N_v,c1_new,c2_new,SH_old,ind=update_energy_vertex(ver,TRI,H,c1,c2,k,A_v,i,normals_face,neighbour,ADJ,NI,area,SHO,et)
+                H_new,Avj,SH_old_neig,ind_neig,c1_neig,c2_neig,ind_c=update_energy_neig(ver,TRI,H_new,c1,c2,k,A_v,i,normals_face,neighbour,ADJ,NI,area,SHO,et,border)
+                H_new=H_new.real
+                #print(H," ",H_new)
+                ΔH=H_new-H
                 P=min(1, np.exp(-β* ΔH))
                 if np.random.rand()>P: #with probability 1-P put vertex back
                     x0-=δ
+                    for u in range(0,len(Nf_old)): #Put back also normals of faces and face areas
+                        area[Nf_old[u][2]]=Nf_old[u][1]
+                        normals_face[Nf_old[u][2]]=Nf_old[u][0]
+                    for v in range(0,len(ind)):   #Put back shape operators 
+                        SHO[:,:,ind[v]]=SH_old[:,:,v]
+                    for w in range(0,len(ind_neig)): #already updates shape op centered in both vertices if not border
+                        SHO[:,:,ind_neig[w]]=SH_old_neig[:,:,w]
+                    
                 else: #particle shifted, update cell list linked list
                     c=int(cx*L[1]*L[2]+cy*L[2]+cz) #linear index that containined x0,that has now been shifted
                     ci=int(cix*L[1]*L[2]+ciy*L[2]+ciz) #new linear index of cell containing x0
@@ -78,6 +86,16 @@ def MCstep_vertex(ver,TRI,header,linklis,L,σ,r,k,β): #tries to move N vertices
                         else: #if particle already present, x0 points to previous header and becomes new header
                             linklis[i]=header[ci]
                             header[ci]=i
+                    #update also A_v, curvatures at vertex,energy
+                    A_v[i]=Av_new #new area at vertex 
+                    for u in range(0,len(Avj)): #new neighbours area
+                        A_v[Avj[u][1]]=Avj[u][0]
+                        c1[ind_c[u]]=c1_neig[u] #new neig curvatures
+                        c2[ind_c[u]]=c2_neig[u]
+                    c1[i]=c1_new; c2[i]=c2_new
+                    H=H_new
+                 
+    return H
 
 # In[3]:
 
@@ -122,9 +140,9 @@ def fliplink(ver,neig,x,y): #PRESERV COUNTER-CLOCKWISE ORDER
 
 #ev,et,te=igl.edge_topology(ver,TRI)
 #neig=igl.adjacency_matrix(TRI)
-def MCstep_link(ver,TRI,neig,β,k,r,ev,et,te): #tries to flip N links
+def MCstep_linkB(ver,TRI,H,neig,β,c1,c2,k,r,ev,et,te,area,normals_face,ADJ,NI,SHO,border,A_v): #tries to flip N links
     index=np.random.permutation(len(te))
-    for n in index[0:len(ver)]:
+    for n in index[0:len(ver)]: #n index of edge that I'm trying to flip
         l,t=te[n][0],te[n][1]
         if l!=-1 and t!=-1: #Don't flip border edges
             x=np.copy(TRI[l]) #te[n] contains labels of the triangles that share that edge
@@ -133,24 +151,27 @@ def MCstep_link(ver,TRI,neig,β,k,r,ev,et,te): #tries to flip N links
             u,v,d,ev_new,both=fliplink(ver,neig,x,y)
             #print(u,v,"NEW")
             if r< d< np.sqrt(2) and d!=0: #just need to check if new edge creates overlap of hard beads or too large thether
-                H_old=elastic_energy(ver,TRI,k)
                 TRI[l]=u #substitute new triangles in TRI 
                 TRI[t]=v
-                H_new=elastic_energy(ver,TRI,k)
-                ΔH=H_new-H_old
+                H_new,Avj,Nf_old,SH_old_tetra,ind_tetra,c1_tetra,c2_tetra,ind_c,ADJ_new,NI_new,ev_old=update_energy_link(ver,ev,TRI,neig,n,H,c1,c2,k,A_v,area,normals_face,x,y,ev_new,l,t,ADJ,NI,SHO,et,te,border)
+                ΔH=H_new-H
                 P=min(1, np.exp(-β* ΔH))
                 if np.random.rand() > P: #with probability 1-P put old triangles back
                     TRI[l]=x 
                     TRI[t]=y
-                else: #Link flipped, update topology
-                    ev[n]=ev_new #ev OK, only egde changing vertices is the flipped one
+                    for jy in ind_tetra:
+                        if te[jy][0]==-1 or te[jy][1]==-1:
+                            print(SH_old_tetra,ind_tetra,n)
+                    #restore old topology
+                    ev[n]=ev_old
+                    
                     neig_edges=[]
                     for i in range(0,3):#List of neigh edges of tethrahedron
                         if et[l][i]!=n and et[l][i] not in neig_edges:
                             neig_edges.append(et[l][i])
                         if et[t][i]!=n and et[t][i] not in neig_edges:
                             neig_edges.append(et[t][i])
-                            
+
                     for j in neig_edges: #for all edges in neig check at which of the new triangle it belongs and update te
                         if ev[j][0] in TRI[l] and ev[j][1] in TRI[l]:
                             if l not in te[j]:
@@ -164,7 +185,7 @@ def MCstep_link(ver,TRI,neig,β,k,r,ev,et,te): #tries to flip N links
                                     te[j][0]=t
                                 else:
                                     te[j][1]=t   #te OK
-                    
+
                     et_l_new=[n]
                     et_t_new=[n]
                     for z in neig_edges: #update list of edge used in triangles t and l
@@ -174,8 +195,32 @@ def MCstep_link(ver,TRI,neig,β,k,r,ev,et,te): #tries to flip N links
                             et_l_new.append(z)
                     et[l]=np.array(et_l_new)
                     et[t]=np.array(et_t_new)
+
                     
-                    neig[both[0],both[1]]=0 #Update neig matrix
-                    neig[both[1],both[0]]=0
-                    neig[ev_new[0],ev_new[1]]=1
-                    neig[ev_new[1],ev_new[0]]=1
+                    #restore old neig matrix
+                    neig[ev[n][0],ev[n][1]]=1; neig[ev[n][1],ev[n][0]]=1 #update neig matrix, put back if move fails OK
+                    neig[ev_new[0],ev_new[1]]=0; neig[ev_new[1],ev_new[0]]=0
+    
+    
+                    #restore old shape ops and normals
+                    
+                    for u in range(0,len(Nf_old)): #Put back also normals of faces and face areas OK
+                        area[Nf_old[u][2]]=Nf_old[u][1]
+                        normals_face[Nf_old[u][2]]=Nf_old[u][0]
+                    for v in range(0,len(ind_tetra)):   #Put back shape operators 
+                        SHO[:,:,ind_tetra[v]]=SH_old_tetra[:,:,v]
+                    
+                    
+                else: #Already updated edge topology and adjacency matrix in update_energy_link
+                    ADJ=ADJ_new #update face adjacency
+                    NI=NI_new
+                    #update curvatures at vertex,energy 
+                    for u in range(0,len(Avj)): #new area
+                        A_v[Avj[u][1]]=Avj[u][0]
+                        c1[ind_c[u]]=c1_tetra[u] #new tetra curvatures
+                        c2[ind_c[u]]=c2_tetra[u]
+                    H=H_new
+                    
+                    
+                    
+    return H,ADJ,NI

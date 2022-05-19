@@ -1,9 +1,11 @@
 DTMC
 
 generate_mesh contains:
+\begin{list}
 -triangular_lattice, generates planar triangular lattice, can change spacing and number of points.
 -create_mesh, performs Delauney triangulation using triangular lattice
 -linked_list_cell, defines linked list that will be used by MC_vertex, and assign vertices to corresponding cells in 3D space.
+\end{list}
 
 MCstep_vertex_link contains:
 -MC_step_vertex, tries to move N vertices using the linklist check that there is no overlapping between hard spheres potential and updates the elastic energy locally. Border vertices are fixed.

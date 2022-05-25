@@ -17,10 +17,12 @@ import numpy as np
 #Calculate curvature at each vertex following Ramakrishnan Mesoscale computational studies of membrane bilayer
 #remodeling by curvature-inducing proteins or Monte Carlo simulations of fluid vesicles with in plane orientational ordering
 
-def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,border):
+def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,border,μ,part):
     aus=0
     curv_E=[]
     f1=[]; f2=[]; eigenv=[]
+    h=np.zeros(len(te))
+    M=np.zeros(len(ver))
     SHO=np.zeros([3,3,len(te)]) #matrix that store shape operator at each edge
     A_v=np.zeros(len(ver))
     for i in range(0,len(ver)): #calculate curvature at each vertex
@@ -68,7 +70,7 @@ def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,bor
                 #find signed dihedral angle
                 ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(np.dot(Nf_1,Nf_2))+np.pi
                 #now can find edge curvature
-                h=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
+                H_e=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
                 #To calculate shape operator calculate first edge normal using face normals
                 N_e=(Nf_1+Nf_2)
                 N_e=N_e/np.linalg.norm(N_e)
@@ -76,7 +78,12 @@ def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,bor
                 R_e=r_e/np.linalg.norm(r_e)
                 b=np.cross(R_e,N_e)
                 b=b/np.linalg.norm(b)
-                S_e=h*np.tensordot(b,b,axes=0) #Shape operator
+                for tri in te[e]: #add -mu to scalar curvature for every adjacent face occupied by a particle
+                    if tri!=-1:
+                        if part[tri]==1:
+                            H_e-=μ
+                S_e=H_e*np.tensordot(b,b,axes=0) #Shape operator
+                h[e]=H_e
                 SHO[:,:,e]=S_e #Save shape operator in position corresponding to edge
                 P_v=np.identity(3)-np.tensordot(N_v,N_v,axes=0) #Projection operator
                 #Project shape operator on edge and obtain shape operator at vertex
@@ -127,12 +134,13 @@ def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,bor
                 c2=0
             f1.append(c1)
             f2.append(c2)
+            M[i]=c1+c2
             aus+=((c1+c2)**2)*A_v[i]*0.5*k
             #curv_E.append(((c1+c2)**2)*A_v[i]*0.5*k)
 
     
     H_elastic=aus
-    return H_elastic,f1,f2,A_v,SHO
+    return H_elastic,M,A_v,SHO,h
 
 
 
@@ -140,7 +148,7 @@ def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,bor
 #Update energy after vertex move, calculates new curvature and energy contribution of shifted vertex
 
 
-def update_energy_vertex(ver,TRI,H_old,c1,c2,k,A_v,i,normals_face,neigh,ADJ,NI,area,SHO,et):
+def update_energy_vertex(ver,TRI,H_old,M,k,A_v,i,normals_face,neigh,ADJ,NI,area,SHO,et,te,h,part,μ):
     #aus=H_old-(((c1[i]+c2[i])**2)*A_v[i]*0.5*k)
     N_v=np.zeros(3)
     Nf_old=[] #list with old face normals, areas and associated indices
@@ -148,6 +156,7 @@ def update_energy_vertex(ver,TRI,H_old,c1,c2,k,A_v,i,normals_face,neigh,ADJ,NI,a
     neig_faces_i=ADJ[NI[i]:NI[i+1]]
     SH_old=np.zeros([3,3,len(neigh[i])]) #Shape operators of old edges
     ind=[] #corresponding indices
+    h_old=np.zeros(len(neigh[i])) #old scalar curvatures, same indices as shape operators
     for m in neig_faces_i: #calculate new vertex area, new face normals, new vertex normal
         x,y,z=ver[TRI[m][0]],ver[TRI[m][1]],ver[TRI[m][2]]
         α=x-y; β=x-z
@@ -192,19 +201,25 @@ def update_energy_vertex(ver,TRI,H_old,c1,c2,k,A_v,i,normals_face,neigh,ADJ,NI,a
             if z in et2:
                 e=z #index of edge on which calculating curvature
         SH_old[:,:,count]=np.copy(SHO[:,:,e]) #store old shape op
+        h_old[count]=h[e] #store old scalar curvature
         ind.append(e) #edge e centered in vertex i
         count+=1
                 
         ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(np.dot(Nf_1,Nf_2))+np.pi
         #now can find edge curvature
-        h=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
+        H_e=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
         #To calculate shape operator calculate first edge normal using face normals
         N_e=(Nf_1+Nf_2)
         N_e=N_e/np.linalg.norm(N_e)
         #Shape operator on edge e
         R_e=r_e/np.linalg.norm(r_e)
         b=np.cross(R_e,N_e)
-        S_e=h*np.tensordot(b,b,axes=0) #Shape operatordot()
+        for tri in te[e]: #add -mu to scalar curvature for every adjacent face occupied by a particle
+            if tri!=-1:
+                if part[tri]==1:
+                    H_e-=μ
+        h[e]=H_e
+        S_e=H_e*np.tensordot(b,b,axes=0) #Shape operatordot()
         SHO[:,:,e]=S_e #update shape operator related to edge e 
         
         P_v=np.identity(3)-np.tensordot(N_v,N_v,axes=0) #Projection operator
@@ -254,20 +269,22 @@ def update_energy_vertex(ver,TRI,H_old,c1,c2,k,A_v,i,normals_face,neigh,ADJ,NI,a
     if abs(c2_new)<=10e-10:
         c2_new=0
 
-    H_new=H_old+(((c1_new+c2_new)**2)*Av_new*0.5*k)-(((c1[i]+c2[i])**2)*A_v[i]*0.5*k)
+    H_new=H_old+(((c1_new+c2_new)**2)*Av_new*0.5*k)-(((M[i])**2)*A_v[i]*0.5*k) #M[i]=c1[i]+c2[i]
+    M_new=c1_new+c2_new
 
-    return H_new, Av_new, Nf_old, N_v,c1_new,c2_new,SH_old,ind
+    return H_new, Av_new, Nf_old, N_v,M_new,SH_old,ind,h_old
 
 
 
 
 #Calculates new curvature and energy contributions of neighborhood of shifted VERTEX. All face adjacent to shifted vertex changed normals and areas, changing normals areas of neigh vertices and shape operators of edges neighboring changed faces. Calculates only the new shape operators.
 
-def update_energy_neig(ver,TRI,H_old,c1,c2,k,A_v,i,normals_face,neigh,ADJ,NI,area,SHO,et,border): #to be used after update energy vertex,uses already updated lists of face normals and areas
+def update_energy_neig(ver,TRI,H_old,M,k,A_v,i,normals_face,neigh,ADJ,NI,area,SHO,et,te,border,h,part,μ): #to be used after update energy vertex,uses already updated lists of face normals and areas
     H_new=H_old
     Avj=[]
     SH_old_neig=np.zeros([3,3,2*len(neigh[i])])
-    c1_neig=[]; c2_neig=[]
+    h_old_neig=np.zeros(2*len(neigh[i]))
+    M_neig=[]
     ind_c=[]
     ind_neig=[]
     count=0
@@ -308,6 +325,7 @@ def update_energy_neig(ver,TRI,H_old,c1,c2,k,A_v,i,normals_face,neigh,ADJ,NI,are
                 W_e=np.dot(N_v,N_e)
                 if z in neigh[i] and e not in visited: #calculate new shape operator for edges neigh triangles that changed face normal
                     SH_old_neig[:,:,count]=np.copy(SHO[:,:,e]) #store old shape op
+                    h_old_neig[count]=h[e]
                     ind_neig.append(e) #edge e centered in vertex i
                     count+=1
                     r_e=ver[z]- ver[j]
@@ -330,10 +348,15 @@ def update_energy_neig(ver,TRI,H_old,c1,c2,k,A_v,i,normals_face,neigh,ADJ,NI,are
 
                     ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(np.dot(Nf_1,Nf_2))+np.pi
                     #now can find edge curvature
-                    h=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
+                    H_e=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
                     R_e=r_e/np.linalg.norm(r_e)
                     b=np.cross(R_e,N_e)
-                    S_e=h*np.tensordot(b,b,axes=0) #Shape operatordot() 
+                    for tri in te[e]: #add -mu to scalar curvature for every adjacent face occupied by a particle
+                        if tri!=-1:
+                            if part[tri]==1:
+                                H_e-=μ
+                    h[e]=H_e
+                    S_e=H_e*np.tensordot(b,b,axes=0) #Shape operatordot() 
                     SHO[:,:,e]=S_e #update shape operator related to edge e centered in i
                     visited.append(e)
 
@@ -383,12 +406,11 @@ def update_energy_neig(ver,TRI,H_old,c1,c2,k,A_v,i,normals_face,neigh,ADJ,NI,are
                 c1_new=0
             if abs(c2_new)<=10e-10:
                 c2_new=0
-            c1_neig.append(c1_new)
-            c2_neig.append(c2_new)
+            M_neig.append(c1_new+c2_new)
             ind_c.append(j)
-            H_new=H_new+(((c1_new+c2_new)**2)*Av*0.5*k)-(((c1[j]+c2[j])**2)*A_v[j]*0.5*k)
+            H_new=H_new+(((c1_new+c2_new)**2)*Av*0.5*k)-(((M[j])**2)*A_v[j]*0.5*k)
         #print(H_new)
-    return H_new,Avj,SH_old_neig,ind_neig,c1_neig,c2_neig,ind_c
+    return H_new,Avj,SH_old_neig,ind_neig,h_old_neig,M_neig,ind_c
 
 
 #LINKFLIP
@@ -427,12 +449,12 @@ def updateADJ(x,y,n,ev_new,l,t,ADJ,NI,ev,TRI): #TRI must be already updated with
 
 #Updates curvature of vertices forming the tethrahedron around the flipped edge, all shape operators forming the tethrahedron change.
 
-def update_energy_link(ver,ev,TRI,neig,n,H_old,c1,c2,k,A_v,area,normals_face,x,y,ev_new,l,t,ADJ,NI,SHO,et,te,border): #x,y old triangles, l,t indices of corresponding new triangles
+def update_energy_link(ver,ev,TRI,neig,n,H_old,M,k,A_v,area,normals_face,x,y,ev_new,l,t,ADJ,NI,SHO,et,te,border,h,part,μ): #x,y old triangles, l,t indices of corresponding new triangles
     tetra=np.concatenate((ev_new,ev[n])) #curvature changed in four vertices around flipped edge
     H_new=H_old
     ADJ_new,NI_new=updateADJ(x,y,n,ev_new,l,t,ADJ,NI,ev,TRI) #updated list of neigh faces
     Nf_old=[] #old face normals, area and indices
-    c1_tetra=[]; c2_tetra=[]; ind_c=[]
+    M_tetra=[]; ind_c=[]
     neig[ev[n][0],ev[n][1]]=0; neig[ev[n][1],ev[n][0]]=0 #update neig matrix, put back if move fails
     neig[ev_new[0],ev_new[1]]=1; neig[ev_new[1],ev_new[0]]=1
     
@@ -484,6 +506,7 @@ def update_energy_link(ver,ev,TRI,neig,n,H_old,c1,c2,k,A_v,area,normals_face,x,y
     visited=[]
     count=0
     SH_old_tetra=np.zeros([3,3,5]) #Shape operators of old edges, at most 5 edges to be updated
+    h_old_tetra=np.zeros(5)
     ind_tetra=[] #corresponding indices
     for j in tetra:#Calculate new curvatures
         if border[j]==False:
@@ -523,6 +546,7 @@ def update_energy_link(ver,ev,TRI,neig,n,H_old,c1,c2,k,A_v,area,normals_face,x,y
                 W_e=np.dot(N_v,N_e)
                 if z in tetra and e not in visited: #calculate new shape operator for edges neigh triangles that changed face normal
                     SH_old_tetra[:,:,count]=np.copy(SHO[:,:,e]) #store old shape op
+                    h_old_tetra[count]=np.copy(h[e])
                     ind_tetra.append(e) #edge e 
                     count+=1
                     r_e=ver[z]- ver[j]
@@ -543,10 +567,15 @@ def update_energy_link(ver,ev,TRI,neig,n,H_old,c1,c2,k,A_v,area,normals_face,x,y
                         Nf_2=normals_face[faces[0]]
                     ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(np.dot(Nf_1,Nf_2))+np.pi
                     #now can find edge curvature
-                    h=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
+                    H_e=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
                     R_e=r_e/np.linalg.norm(r_e)
                     b=np.cross(R_e,N_e)
-                    S_e=h*np.tensordot(b,b,axes=0) #Shape operator
+                    for tri in te[e]: #add -mu to scalar curvature for every adjacent face occupied by a particle
+                        if tri!=-1:
+                            if part[tri]==1:
+                                H_e-=μ
+                    h[e]=H_e
+                    S_e=H_e*np.tensordot(b,b,axes=0) #Shape operator
                     SHO[:,:,e]=S_e #update shape operator related to edge e
                     visited.append(e)
 
@@ -594,12 +623,11 @@ def update_energy_link(ver,ev,TRI,neig,n,H_old,c1,c2,k,A_v,area,normals_face,x,y
                 c1_new=0
             if abs(c2_new)<=10e-10:
                 c2_new=0
-            c1_tetra.append(c1_new)
-            c2_tetra.append(c2_new)
+            M_tetra.append(c1_new+c2_new)
             ind_c.append(j)
-            H_new=H_new+(((c1_new+c2_new)**2)*Av_new*0.5*k)-(((c1[j]+c2[j])**2)*A_v[j]*0.5*k)
+            H_new=H_new+(((c1_new+c2_new)**2)*Av_new*0.5*k)-(((M[j])**2)*A_v[j]*0.5*k)
         #print(H_new)
-    return H_new,Avj,Nf_old,SH_old_tetra,ind_tetra,c1_tetra,c2_tetra,ind_c,ADJ_new,NI_new,ev_old
+    return H_new,Avj,Nf_old,SH_old_tetra,h_old_tetra,ind_tetra,M_tetra,ind_c,ADJ_new,NI_new,ev_old
 
 
 

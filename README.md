@@ -19,4 +19,4 @@ elastic_energy contains:
 5. update_energy_link, updates curvature of neig tethrahedron after linkflip
 
 particles contains:
-1.particlesA, particles insertion and diffusion. To update energy calculates new curvature in each corner of triangle from which particle inserted/removed
+1. particlesA, particles insertion and diffusion. To update energy calculates new curvature in each corner of triangle from which particle inserted/removed

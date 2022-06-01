@@ -17,3 +17,6 @@ elastic_energy contains:
 3. update_energy_neig, updates elastic energy contribution of neighborhood of shifted vertex
 4. updateADJ, updates vertex face adjacency list after linkflip
 5. update_energy_link, updates curvature of neig tethrahedron after linkflip
+
+particles contains:
+1. particlesA, particles insertion and diffusion. To update energy calculates new curvature in each corner of triangle from which particle inserted/removed

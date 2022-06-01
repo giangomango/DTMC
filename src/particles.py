@@ -213,6 +213,34 @@ def particlesA(ver,TRI,H_el,k,k_I,k_D,g,μ,SHO,h,M,A_v,normals_face,normals_ver,
     return part,H_el
 
 
+
+#The two functions below toghether find the clusters and remove the particles of clusters contanining a number of faces greater than a treshold N_E
+def DFS(i,et,te,part,cluster,visited):
+    visited[i]=1
+    cluster.append(i)
+    for j in et[i]: #cycle over the edges forming the triangle i
+        for z in te[j]: #triangles neighboring edge j
+            if z!=i and z!=-1: #select the neighbor
+                if part[z]==1 and visited[z]==0: #if particle present and not already visited
+                    DFS(z,et,te,part,cluster,visited)
+                    
+def extraction(TRI,et,te,part,N_E):
+    clusters=[]
+    visited=np.zeros(len(TRI))
+    for i in range(0,len(TRI)):
+        if part[i]==1 and visited[i]==0:
+            cluster=[]
+            DFS(i,et,te,part,cluster,visited)
+            if len(cluster)>N_E: #if cluster have number of elements greater than extraction number remove it
+                for z in cluster: #remove all particles forming the cluster
+                    part[z]=0
+            else:
+                if len(cluster)>2:
+                    clusters.append(cluster) #store clusters present after extraction
+    return clusters
+                
+
+
 # In[ ]:
 
 

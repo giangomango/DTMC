@@ -157,7 +157,7 @@ def MCstep_linkB(ver,TRI,H,neig,β,M,k,r,ev,et,te,area,normals_face,ADJ,NI,SHO,b
                 H_new,Avj,Nf_old,SH_old_tetra,h_old_tetra,ind_tetra,M_tetra,ind_c,ADJ_new,NI_new,ev_old=update_energy_link(ver,ev,TRI,neig,n,H,M,k,A_v,area,normals_face,x,y,ev_new,l,t,ADJ,NI,SHO,et,te,border,h,part,μ)
                 ΔH=H_new-H
                 P=min(1, np.exp(-β* ΔH))
-                print("flip attempt")
+                #print("flip attempt")
                 if np.random.rand() > P: #with probability 1-P put old triangles back
                     TRI[l]=x 
                     TRI[t]=y

@@ -19,15 +19,13 @@ import numpy as np
 
 def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,border,μ,part):
     aus=0
-    curv_E=[]
-    f1=[]; f2=[]; eigenv=[]
     h=np.zeros(len(te))
     M=np.zeros(len(ver))
     SHO=np.zeros([3,3,len(te)]) #matrix that store shape operator at each edge
     A_v=np.zeros(len(ver))
     for i in range(0,len(ver)): #calculate curvature at each vertex
         if border[i]==True:
-            f1.append(0.0); f2.append(0.0) #zero curvature at border vertices
+            M[i]=0.0 #zero curvature at border vertices
         else:
             #Calculate Area associated to each vertex for later use
             neig_faces_i=ADJ[NI[i]:NI[i+1]] #faces neighbouring vertex i
@@ -68,7 +66,9 @@ def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,bor
                     if z in et2:
                         e=z #index of edge on which calculating curvature
                 #find signed dihedral angle
-                ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(np.dot(Nf_1,Nf_2))+np.pi
+                cos=np.dot(Nf_1,Nf_2) #to avoid numerical problems with arc cosine
+                cos = np.clip(cos, -1, 1)
+                ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(cos)+np.pi
                 #now can find edge curvature
                 H_e=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
                 #To calculate shape operator calculate first edge normal using face normals
@@ -132,8 +132,6 @@ def Elastic_Local(ver,TRI,k,normals_ver,normals_face,area,neigh,ADJ,NI,et,te,bor
                 c1=0
             if abs(c2)<=10e-10:
                 c2=0
-            f1.append(c1)
-            f2.append(c2)
             M[i]=c1+c2
             aus+=((c1+c2)**2)*A_v[i]*0.5*k
             #curv_E.append(((c1+c2)**2)*A_v[i]*0.5*k)
@@ -205,7 +203,9 @@ def update_energy_vertex(ver,TRI,H_old,M,k,A_v,i,normals_face,neigh,ADJ,NI,area,
         ind.append(e) #edge e centered in vertex i
         count+=1
                 
-        ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(np.dot(Nf_1,Nf_2))+np.pi
+        cos=np.dot(Nf_1,Nf_2)
+        cos = np.clip(cos, -1, 1)
+        ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(cos)+np.pi
         #now can find edge curvature
         H_e=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
         #To calculate shape operator calculate first edge normal using face normals
@@ -255,7 +255,7 @@ def update_energy_vertex(ver,TRI,H_old,M,k,A_v,i,normals_face,neigh,ADJ,NI,area,
             c2_new=((p+s)-np.sqrt(insq))*0.5  #smallest
         else: #degenerate eigenvalues
             c1_new=(p+s)*0.5                               
-            c2_new=c1
+            c2_new=c1_new
     else:
         if p>s:
             c1_new=p
@@ -346,7 +346,9 @@ def update_energy_neig(ver,TRI,H_old,M,k,A_v,i,normals_face,neigh,ADJ,NI,area,SH
                         Nf_1=normals_face[faces[1]]
                         Nf_2=normals_face[faces[0]]
 
-                    ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(np.dot(Nf_1,Nf_2))+np.pi
+                    cos=np.dot(Nf_1,Nf_2)
+                    cos = np.clip(cos, -1, 1)
+                    ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(cos)+np.pi
                     #now can find edge curvature
                     H_e=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
                     R_e=r_e/np.linalg.norm(r_e)
@@ -390,7 +392,7 @@ def update_energy_neig(ver,TRI,H_old,M,k,A_v,i,normals_face,neigh,ADJ,NI,area,SH
                     c2_new=((p+s)-np.sqrt(insq))*0.5  #smallest
                 else: #degenerate eigenvalues
                     c1_new=(p+s)*0.5                               
-                    c2_new=c1
+                    c2_new=c1_new
             else:
                 if p>s:
                     c1_new=p
@@ -565,7 +567,9 @@ def update_energy_link(ver,ev,TRI,neig,n,H_old,M,k,A_v,area,normals_face,x,y,ev_
                     else:
                         Nf_1=normals_face[faces[1]]
                         Nf_2=normals_face[faces[0]]
-                    ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(np.dot(Nf_1,Nf_2))+np.pi
+                    cos=np.dot(Nf_1,Nf_2)
+                    cos = np.clip(cos, -1, 1)
+                    ϕ=np.sign(np.dot(np.cross(Nf_1,Nf_2),r_e))*np.arccos(cos)+np.pi
                     #now can find edge curvature
                     H_e=2*np.linalg.norm(r_e)*np.cos(0.5*ϕ)
                     R_e=r_e/np.linalg.norm(r_e)
@@ -607,7 +611,7 @@ def update_energy_link(ver,ev,TRI,neig,n,H_old,M,k,A_v,area,normals_face,x,y,ev_
                     c2_new=((p+s)-np.sqrt(insq))*0.5  #smallest
                 else: #degenerate eigenvalues
                     c1_new=(p+s)*0.5                               
-                    c2_new=c1
+                    c2_new=c1_new
             else:
                 if p>s:
                     c1_new=p

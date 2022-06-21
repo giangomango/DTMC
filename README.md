@@ -3,8 +3,9 @@ DTMC
 generate_mesh contains:
 
 1. triangular_lattice, generates planar triangular lattice, can change spacing and number of points.
-2. create_mesh, performs Delauney triangulation using triangular lattice
-3. linked_list_cell, defines linked list that will be used by MC_vertex, and assign vertices to corresponding cells in 3D space.
+2. create_planar_mesh, performs Delauney triangulation using triangular lattice
+3. create_spherical_mesh, creates triangulated spherical surface
+4. linked_list_cell, defines linked list that will be used by MC_vertex, and assign vertices to corresponding cells in 3D space.
 
 
 MCstep_vertex_link contains:

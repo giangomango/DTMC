@@ -236,7 +236,7 @@ def extraction(TRI,et,te,part,N_E):
                     part[z]=0
             else:
                 if len(cluster)>2:
-                    clusters.append(cluster) #store clusters present after extraction
+                    clusters.append(np.array(cluster)) #store clusters present after extraction
     return clusters
                 
 

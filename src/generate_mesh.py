@@ -61,12 +61,22 @@ def triangular_lattice(point_distance ,expansion_level = 4, starting_point = (0,
     return list(set_of_points_on_the_plane)
 
 
+import stripy
+import igl
+
+def create_spherical_mesh(refinment_levels):
+    GNER=stripy.spherical_meshes.icosahedral_mesh(include_face_points=False,refinement_levels=3)
+    ver,TRI=GNER.points,GNER.simplices
+    c=1.2/igl.avg_edge_length(ver, TRI) #rescale vertices such that medium distance is 1.2 (hard spheres of diameter 1 and max thether length sqrt(2))
+    ver=ver*c
+    return ver,TRI
+
 # In[3]:
 
 #Create the actual triangulation of 2D points and add a z coordinate
 from scipy.spatial import Delaunay
 
-def create_mesh(triangular_lattice):
+def create_planar_mesh(triangular_lattice):
     TRI_SCIPY=Delaunay(triangular_lattice)
     TRI=TRI_SCIPY.simplices
 

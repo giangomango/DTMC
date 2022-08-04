@@ -21,3 +21,5 @@ elastic_energy contains:
 
 particles contains:
 1. particlesA, particles insertion and diffusion. To update energy calculates new curvature in each corner of triangle from which particle inserted/removed
+2. DFS, search connected components of particles onto the surface
+3. extraction, removes clusters larger than a certain size. Do not update curvature, with the idea that some relaxation time is necessary for the configuration to relax back. Curvature is updated during the subsequent MC dynamics.

@@ -1,10 +1,6 @@
 # DTMC
 Code accompanying my master thesis "Self-Organized Molecular Sorting on Fluid Membranes", http://webthesis.biblio.polito.it/id/eprint/23624.
 
-## Example of configurations:
-Example of configurations at different values of the bending rigidity $k$ and the particle-membrane curvature interaction parameter $\mu$. Configurations with $N=642$ vertices in their stationary state.
-<img src="https://user-images.githubusercontent.com/69627774/187253745-8c2f6ae5-cb15-498e-8a42-21c20013ccef.png" width="70%" height="70%">
-
 ## generate_mesh contains:
 
 1. triangular_lattice, generates planar triangular lattice, can change spacing and number of points.
@@ -28,4 +24,9 @@ Example of configurations at different values of the bending rigidity $k$ and th
 1. particlesA, particles insertion and diffusion. To update energy calculates new curvature in each corner of triangle from which particle inserted/removed
 2. DFS, search connected components of particles onto the surface
 3. extraction, removes clusters larger than a certain size. Do not update curvature, with the idea that some relaxation time is necessary for the configuration to relax back. Curvature is updated during the subsequent MC dynamics.
+
+
+## Example of configurations:
+Example of configurations at different values of the bending rigidity $k$ and the particle-membrane curvature interaction parameter $\mu$. Configurations with $N=642$ vertices in their stationary state.
+<img src="https://user-images.githubusercontent.com/69627774/187253745-8c2f6ae5-cb15-498e-8a42-21c20013ccef.png" width="70%" height="70%">
 

@@ -1,5 +1,5 @@
 # DTMC
-Code accompanying my master thesis "Self-Organized Molecular Sorting on Fluid Membranes", http://webthesis.biblio.polito.it/id/eprint/23624.
+Code accompanying master thesis "Self-Organized Molecular Sorting on Fluid Membranes", http://webthesis.biblio.polito.it/id/eprint/23624.
 
 ## generate_mesh contains:
 
